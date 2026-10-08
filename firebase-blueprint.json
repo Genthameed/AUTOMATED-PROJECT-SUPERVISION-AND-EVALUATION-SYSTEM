@@ -1,0 +1,201 @@
+{
+  "entities": {
+    "UserAccount": {
+      "title": "User Account",
+      "description": "System account for students, supervisors, panel members, and administrators",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "name": { "type": "string", "maxLength": 100 },
+        "email": { "type": "string", "format": "email", "maxLength": 100 },
+        "role": {
+          "type": "string",
+          "enum": ["student", "internal_supervisor", "external_supervisor", "panel_member", "admin"]
+        },
+        "matricOrStaffId": { "type": "string", "maxLength": 50 },
+        "department": { "type": "string", "maxLength": 100 },
+        "isActive": { "type": "boolean" },
+        "createdAt": { "type": "string", "maxLength": 50 }
+      },
+      "required": ["id", "name", "email", "role"]
+    },
+    "StudentProject": {
+      "title": "Student Project",
+      "description": "Undergraduate research project dossier and status",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "studentId": { "type": "string", "maxLength": 128 },
+        "studentName": { "type": "string", "maxLength": 100 },
+        "matricNumber": { "type": "string", "maxLength": 50 },
+        "topicTitle": { "type": "string", "maxLength": 300 },
+        "track": { "type": "string", "maxLength": 100 },
+        "supervisorId": { "type": "string", "maxLength": 128 },
+        "supervisorName": { "type": "string", "maxLength": 100 },
+        "overallProgress": { "type": "number" },
+        "currentPhase": { "type": "string", "maxLength": 100 },
+        "defenseClearance": { "type": "boolean" },
+        "plagiarismScore": { "type": "number" },
+        "updatedAt": { "type": "string", "maxLength": 50 }
+      },
+      "required": ["id", "studentName", "matricNumber", "topicTitle"]
+    },
+    "ChapterSubmission": {
+      "title": "Chapter Submission",
+      "description": "Dissertation chapter submission and supervisor review",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "studentId": { "type": "string", "maxLength": 128 },
+        "matricNumber": { "type": "string", "maxLength": 50 },
+        "chapterNumber": { "type": "number" },
+        "chapterTitle": { "type": "string", "maxLength": 200 },
+        "fileName": { "type": "string", "maxLength": 200 },
+        "fileSize": { "type": "string", "maxLength": 50 },
+        "submissionDate": { "type": "string", "maxLength": 50 },
+        "status": {
+          "type": "string",
+          "enum": ["pending", "under_review", "approved", "requires_revision"]
+        },
+        "feedback": { "type": "string", "maxLength": 1000 }
+      },
+      "required": ["id", "chapterNumber", "chapterTitle", "status"]
+    },
+    "MeetingRecord": {
+      "title": "Meeting Record",
+      "description": "Supervisory consultation log and lab bench meeting",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "studentId": { "type": "string", "maxLength": 128 },
+        "supervisorId": { "type": "string", "maxLength": 128 },
+        "date": { "type": "string", "maxLength": 50 },
+        "time": { "type": "string", "maxLength": 50 },
+        "mode": { "type": "string", "maxLength": 50 },
+        "agenda": { "type": "string", "maxLength": 300 },
+        "actionItems": { "type": "string", "maxLength": 500 },
+        "status": { "type": "string", "enum": ["completed", "scheduled", "cancelled"] }
+      },
+      "required": ["id", "date", "agenda", "status"]
+    },
+    "DefenseSession": {
+      "title": "Defense Session",
+      "description": "Defense timetable and oral examination schedule",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "studentId": { "type": "string", "maxLength": 128 },
+        "candidateName": { "type": "string", "maxLength": 100 },
+        "matricNumber": { "type": "string", "maxLength": 50 },
+        "type": { "type": "string", "enum": ["proposal", "internal", "external"] },
+        "stage": { "type": "string", "maxLength": 100 },
+        "date": { "type": "string", "maxLength": 50 },
+        "time": { "type": "string", "maxLength": 50 },
+        "venue": { "type": "string", "maxLength": 100 },
+        "panelChair": { "type": "string", "maxLength": 100 },
+        "status": { "type": "string", "enum": ["scheduled", "in_progress", "completed", "cleared"] }
+      },
+      "required": ["id", "candidateName", "matricNumber", "venue", "status"]
+    },
+    "SenateBroadsheetEntry": {
+      "title": "Senate Broadsheet Entry",
+      "description": "Official graduation broadsheet score and endorsement record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "matric": { "type": "string", "maxLength": 50 },
+        "name": { "type": "string", "maxLength": 100 },
+        "topic": { "type": "string", "maxLength": 300 },
+        "supervisor": { "type": "string", "maxLength": 100 },
+        "track": { "type": "string", "maxLength": 100 },
+        "supervisorScore": { "type": "number" },
+        "internalScore": { "type": "number" },
+        "externalScore": { "type": "number" },
+        "totalScore": { "type": "number" },
+        "letterGrade": { "type": "string", "maxLength": 2 },
+        "gradePoint": { "type": "number" },
+        "classification": { "type": "string", "maxLength": 50 },
+        "similarityIndex": { "type": "number" },
+        "status": { "type": "string", "maxLength": 100 },
+        "remarks": { "type": "string", "maxLength": 500 },
+        "endorsedByHOD": { "type": "boolean" },
+        "endorsedByExternal": { "type": "boolean" }
+      },
+      "required": ["id", "matric", "name", "totalScore", "letterGrade"]
+    },
+    "ExternalCandidate": {
+      "title": "External Candidate",
+      "description": "Candidate dossier and moderation records for external examiners",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "matric": { "type": "string", "maxLength": 50 },
+        "name": { "type": "string", "maxLength": 100 },
+        "track": { "type": "string", "maxLength": 100 },
+        "topic": { "type": "string", "maxLength": 300 },
+        "abstract": { "type": "string", "maxLength": 2000 },
+        "date": { "type": "string", "maxLength": 50 },
+        "time": { "type": "string", "maxLength": 50 },
+        "venue": { "type": "string", "maxLength": 100 },
+        "supervisor": { "type": "string", "maxLength": 100 },
+        "status": { "type": "string", "maxLength": 50 }
+      },
+      "required": ["id", "matric", "name", "topic"]
+    },
+    "DefenseClearanceForm": {
+      "title": "Defense Clearance Form",
+      "description": "Statutory defense clearance verification forms for proposal, internal, and external viva",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "candidateMatric": { "type": "string", "maxLength": 50 },
+        "candidateName": { "type": "string", "maxLength": 100 },
+        "programme": { "type": "string", "maxLength": 100 },
+        "level": { "type": "string", "maxLength": 20 },
+        "supervisorName": { "type": "string", "maxLength": 100 },
+        "projectTitle": { "type": "string", "maxLength": 300 },
+        "defenseType": { "type": "string", "enum": ["proposal", "internal", "external"] },
+        "recommendation": { "type": "string", "enum": ["cleared", "not_cleared"] },
+        "evaluatorName": { "type": "string", "maxLength": 100 },
+        "evaluatorRole": { "type": "string", "maxLength": 100 },
+        "date": { "type": "string", "maxLength": 50 },
+        "status": { "type": "string", "enum": ["Draft", "Endorsed", "Rejected"] }
+      },
+      "required": ["id", "candidateMatric", "candidateName", "defenseType", "recommendation"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserAccount",
+      "description": "User profile and access control accounts"
+    },
+    "/student_projects/{projectId}": {
+      "schema": "StudentProject",
+      "description": "Student project records and progress"
+    },
+    "/chapter_submissions/{submissionId}": {
+      "schema": "ChapterSubmission",
+      "description": "Submitted dissertation chapters and supervisor feedback"
+    },
+    "/meeting_records/{meetingId}": {
+      "schema": "MeetingRecord",
+      "description": "Supervision logbook and laboratory consultations"
+    },
+    "/defense_sessions/{sessionId}": {
+      "schema": "DefenseSession",
+      "description": "Scheduled defense timetables and viva panels"
+    },
+    "/senate_broadsheet/{entryId}": {
+      "schema": "SenateBroadsheetEntry",
+      "description": "Final departmental senate broadsheet scores and ratification"
+    },
+    "/external_candidates/{candidateId}": {
+      "schema": "ExternalCandidate",
+      "description": "External moderation candidate records"
+    },
+    "/defense_clearances/{clearanceId}": {
+      "schema": "DefenseClearanceForm",
+      "description": "Statutory defense clearance records across all defense phases"
+    }
+  }
+}

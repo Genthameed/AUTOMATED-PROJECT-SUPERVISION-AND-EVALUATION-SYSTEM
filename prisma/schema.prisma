@@ -1,0 +1,530 @@
+// =============================================================================
+// Automated Project Supervision & Evaluation System (APSES)
+// Production Prisma Schema - Domain-Engineered for Laboratory Sciences & Microbiology
+// =============================================================================
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// -----------------------------------------------------------------------------
+// ENUMS
+// -----------------------------------------------------------------------------
+
+enum UserRole {
+  STUDENT
+  INTERNAL_SUPERVISOR
+  PANEL_MEMBER
+  EXTERNAL_SUPERVISOR
+  LAB_TECHNOLOGIST       // Crucial for certifying wet-lab benchwork & autoclave/reagent logbooks
+  HEAD_OF_DEPARTMENT     // HOD oversight for departmental pre-defense clearance & gazettes
+  ADMIN
+}
+
+enum ProjectStatus {
+  TOPIC_SUBMITTED
+  PROPOSAL_APPROVED
+  BENCHWORK_IN_PROGRESS  // Active wet-lab phase (media prep, isolation, bioassays)
+  INTERNAL_DEFENSE_CLEARED
+  EXTERNAL_VIVA_READY
+  COMPLETED
+  REJECTED
+}
+
+enum DocumentType {
+  PROPOSAL
+  ETHICS_CLEARANCE_LETTER
+  LAB_BENCH_LOGBOOK
+  RAW_SPECTROPHOTOMETRY_DATA
+  TURNITIN_SIMILARITY_REPORT
+  CHAPTER_1_3
+  FINAL_DISSERTATION
+  DEFENSE_SLIDES
+}
+
+enum DocumentStatus {
+  PENDING_REVIEW
+  UNDER_REVIEW
+  APPROVED
+  REVISION_REQUIRED
+  REJECTED
+}
+
+enum MilestoneStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  OVERDUE
+}
+
+enum MilestoneCategory {
+  TOPIC_FORMULATION
+  BIOETHICS_APPROVAL
+  MEDIA_PREP_SAMPLING
+  ISOLATION_IDENTIFICATION
+  ANTIBIOGRAM_BIOASSAY
+  MOLECULAR_PCR_ANALYSIS
+  DISSERTATION_WRITING
+  PLAGIARISM_AUDIT
+  INTERNAL_PRE_DEFENSE
+  EXTERNAL_VIVA_VOCE
+}
+
+enum DefenseType {
+  PROPOSAL
+  INTERNAL_PRE_DEFENSE
+  EXTERNAL_VIVA_VOCE
+}
+
+enum PanelRole {
+  PANEL_CHAIR_HOD
+  LEAD_SUPERVISOR
+  CO_SUPERVISOR
+  INTERNAL_EXAMINER
+  EXTERNAL_EXAMINER
+}
+
+enum EvaluationStatus {
+  DRAFT
+  SUBMITTED
+  CERTIFIED_BY_DEAN
+}
+
+enum ClearanceStage {
+  BIOETHICS_GATEWAY      // Clearance to handle clinical specimens & pathogens
+  BENCHWORK_COMPLETION   // Certified by Chief Lab Technologist & Supervisor
+  TURNITIN_SIMILARITY    // Must be strictly < 15% statutory threshold
+  FINANCIAL_FEES         // Departmental & faculty dues cleared
+  INTERNAL_PRE_DEFENSE   // Departmental Board clearance
+  EXTERNAL_SENATE_VIVA   // Final university viva voce clearance
+}
+
+enum ClearanceStatus {
+  PENDING
+  CLEARED
+  FLAGGED_FOR_REVISION
+  REJECTED
+}
+
+enum BiosafetyLevel {
+  BSL_1
+  BSL_2                  // Standard for clinical MRSA, ESBL, bacteriophage work
+  BSL_3
+}
+
+// -----------------------------------------------------------------------------
+// 1. USER MODEL
+// -----------------------------------------------------------------------------
+model User {
+  id                  String              @id @default(uuid())
+  email               String              @unique
+  passwordHash        String?
+  name                String
+  role                UserRole
+  identifier          String              @unique // Matric (e.g. MCB/2021/0445) or Staff ID
+  department          String              @default("Microbiology")
+  faculty             String              @default("Faculty of Science")
+  specializationTrack String?             // e.g. "Virology & Bacteriology", "Medical Microbiology"
+  phoneNumber         String?
+  avatarUrl           String?
+  isActive            Boolean             @default(false) // Strictly defaults to false for new student registrations
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+
+  // Student 1-to-1 Project Relationship
+  studentProject      Project?            @relation("StudentProject")
+
+  // Supervisor 1-to-Many Supervised Projects
+  supervisedProjects  Project[]           @relation("SupervisorProjects")
+
+  // Laboratory Benchwork Logbooks certified by Technologist/Supervisor
+  certifiedLabLogs    LabLogbookEntry[]   @relation("TechnologistCertifiedLogs")
+
+  // Documents uploaded/reviewed
+  uploadedDocuments   Document[]          @relation("UserUploadedDocuments")
+  reviewedDocuments   Document[]          @relation("SupervisorReviewedDocuments")
+
+  // Meetings logged by supervisor
+  supervisorMeetings  Meeting[]           @relation("SupervisorMeetings")
+
+  // Student Viva Voce defense sessions
+  studentDefenses     DefenseSchedule[]   @relation("StudentDefenseSchedules")
+
+  // Panel appointments across viva voce defense sessions
+  panelAppointments   DefensePanelMember[]
+
+  // Rubric evaluations given as an examiner
+  evaluationsGiven    Evaluation[]        @relation("EvaluatorEvaluations")
+
+  // Rubric evaluations received as a candidate
+  evaluationsReceived Evaluation[]        @relation("StudentEvaluations")
+
+  // Clearances assigned to student
+  clearances          Clearance[]         @relation("StudentClearances")
+
+  // Clearances approved/signed by faculty or technologist
+  approvedClearances  Clearance[]         @relation("ApproverClearances")
+
+  // Ethics applications submitted
+  ethicsSubmissions   EthicsClearance[]   @relation("StudentEthics")
+  reviewedEthics      EthicsClearance[]   @relation("CommitteeEthicsReviews")
+
+  @@index([role])
+  @@index([department])
+  @@index([identifier])
+}
+
+// -----------------------------------------------------------------------------
+// 2. PROJECT MODEL (Adama's Core Dissertation Record)
+// -----------------------------------------------------------------------------
+model Project {
+  id                   String              @id @default(uuid())
+  topic                String              // e.g. "Isolation and Characterization of Lytic Bacteriophages..."
+  abstract             String?             @db.Text
+  methodologyOverview  String?             @db.Text
+  targetMicroorganisms String[]            // e.g. ["Staphylococcus aureus", "Pseudomonas aeruginosa"]
+  approvalStatus       ProjectStatus       @default(TOPIC_SUBMITTED)
+  completionPercentage Float               @default(0.0) // 0.0 - 100.0%
+  academicSession      String              @default("2025/2026")
+
+  // Exactly ONE active Project per Student
+  studentId            String              @unique
+  student              User                @relation("StudentProject", fields: [studentId], references: [id], onDelete: Cascade)
+
+  // Supervised by Lead Internal Supervisor
+  supervisorId         String
+  supervisor           User                @relation("SupervisorProjects", fields: [supervisorId], references: [id], onDelete: Restrict)
+
+  // Sub-modules & Lifecycle Models
+  ethicsClearance      EthicsClearance?
+  plagiarismAudit      PlagiarismAudit?
+  labLogbooks          LabLogbookEntry[]
+  documents            Document[]
+  milestones           Milestone[]
+  meetings             Meeting[]
+  defenseSchedules     DefenseSchedule[]
+  masterScoreRollup    MasterScoreRollup?
+
+  createdAt            DateTime            @default(now())
+  updatedAt            DateTime            @updatedAt
+
+  @@index([supervisorId])
+  @@index([approvalStatus])
+}
+
+// -----------------------------------------------------------------------------
+// 3. ETHICS CLEARANCE MODEL (Institutional Bio-Ethics Approval)
+// Mandatory prior to sampling in hospitals, abattoirs, or clinical isolates
+// -----------------------------------------------------------------------------
+model EthicsClearance {
+  id                 String          @id @default(uuid())
+  projectId          String          @unique
+  project            Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  studentId          String
+  student            User            @relation("StudentEthics", fields: [studentId], references: [id], onDelete: Cascade)
+
+  protocolNumber     String          @unique // e.g. "KASU/REC/2026/089"
+  biosafetyLevel     BiosafetyLevel  @default(BSL_2)
+  clinicalSource     String          // e.g. "Barau Dikko Teaching Hospital Clinical Isolates"
+  status             ClearanceStatus @default(PENDING)
+  approvalLetterUrl  String?
+  
+  committeeReviewerId String?
+  committeeReviewer   User?           @relation("CommitteeEthicsReviews", fields: [committeeReviewerId], references: [id], onDelete: SetNull)
+
+  validFrom          DateTime?
+  validUntil         DateTime?
+  approvalComments   String?         @db.Text
+
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+
+  @@index([protocolNumber])
+  @@index([status])
+}
+
+// -----------------------------------------------------------------------------
+// 4. LAB LOGBOOK & BENCHWORK MODEL (Wet-Lab Experimental Verification)
+// Records double-layer plaque assays, MICs, PCR gel documentation, etc.
+// -----------------------------------------------------------------------------
+model LabLogbookEntry {
+  id                   String   @id @default(uuid())
+  projectId            String
+  project              Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  assayDate            DateTime
+  experimentTitle      String   // e.g. "Double-Layer Plaque Assay & Host Range Determination"
+  targetStrain         String   // e.g. "Clinical MRSA Inpatient Isolate #KA-04"
+  observations         String   @db.Text
+  reagentsUsed         String[] // e.g. ["Nutrient Broth", "0.7% Soft Agar", "Calcium Chloride 10mM"]
+  rawDatasetUrl        String?  // Excel / CSV / Spectrophotometer curve file
+  photomicrographUrl   String?  // Plaque morphology / Agarose gel doc band photo
+
+  // Technologist or Chief Supervisor Sign-off
+  isBenchVerified      Boolean  @default(false)
+  verifiedById         String?
+  verifiedBy           User?    @relation("TechnologistCertifiedLogs", fields: [verifiedById], references: [id], onDelete: SetNull)
+  verifiedAt           DateTime?
+  technologistRemarks  String?
+
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@index([projectId])
+  @@index([assayDate])
+}
+
+// -----------------------------------------------------------------------------
+// 5. PLAGIARISM AUDIT MODEL (Turnitin & Statutory Similarity Verification)
+// -----------------------------------------------------------------------------
+model PlagiarismAudit {
+  id                String          @id @default(uuid())
+  projectId         String          @unique
+  project           Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  digitalReceiptId  String          @unique // e.g. "TRN-2026-994821"
+  similarityIndex   Float           // e.g. 8.4 (%)
+  statutoryMaxLimit Float           @default(15.0) // NUC maximum ceiling is 15.0%
+  isPassed          Boolean         @default(false)
+  
+  reportPdfUrl      String
+  internetSources   Float?          // e.g. 4.2%
+  publicationsMatch Float?          // e.g. 3.1%
+  studentPapers     Float?          // e.g. 1.1%
+  auditDate         DateTime        @default(now())
+
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  @@index([digitalReceiptId])
+  @@index([isPassed])
+}
+
+// -----------------------------------------------------------------------------
+// 6. DOCUMENT MODEL
+// -----------------------------------------------------------------------------
+model Document {
+  id                 String         @id @default(uuid())
+  projectId          String
+  project            Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  uploadedById       String
+  uploadedBy         User           @relation("UserUploadedDocuments", fields: [uploadedById], references: [id], onDelete: Cascade)
+
+  type               DocumentType
+  fileName           String
+  fileUrl            String
+  fileSize           Int?           // bytes
+  mimeType           String?
+  version            Int            @default(1)
+  status             DocumentStatus @default(PENDING_REVIEW)
+  supervisorFeedback String?        @db.Text
+
+  reviewedById       String?
+  reviewedBy         User?          @relation("SupervisorReviewedDocuments", fields: [reviewedById], references: [id], onDelete: SetNull)
+  reviewedAt         DateTime?
+
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+
+  @@index([projectId, type])
+  @@index([status])
+}
+
+// -----------------------------------------------------------------------------
+// 7. MILESTONE MODEL (Structured by Microbiology Stage Gates)
+// -----------------------------------------------------------------------------
+model Milestone {
+  id          String            @id @default(uuid())
+  projectId   String
+  project     Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  category    MilestoneCategory
+  title       String
+  description String?           @db.Text
+  deadline    DateTime
+  status      MilestoneStatus   @default(PENDING)
+  completedAt DateTime?
+  orderIndex  Int               @default(0)
+
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  @@index([projectId])
+  @@index([category])
+  @@index([deadline])
+}
+
+// -----------------------------------------------------------------------------
+// 8. MEETING MODEL (Supervision Records with Action Points)
+// -----------------------------------------------------------------------------
+model Meeting {
+  id           String   @id @default(uuid())
+  projectId    String
+  project      Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  supervisorId String
+  supervisor   User     @relation("SupervisorMeetings", fields: [supervisorId], references: [id], onDelete: Restrict)
+
+  date         DateTime
+  venueLink    String   // e.g. "Microbiology Lab 204" or Zoom link
+  agenda       String   @db.Text
+  actionPoints String   @db.Text
+  benchNotes   String?  @db.Text
+  attended     Boolean  @default(true)
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([projectId])
+  @@index([supervisorId])
+  @@index([date])
+}
+
+// -----------------------------------------------------------------------------
+// 9. DEFENSE SCHEDULE MODEL
+// -----------------------------------------------------------------------------
+model DefenseSchedule {
+  id                 String               @id @default(uuid())
+  type               DefenseType          // Proposal, Internal Pre-Defense, External Viva
+  datetime           DateTime
+  venue              String               // e.g. "Faculty Boardroom 204 / Senate Chamber"
+
+  assignedStudentId  String
+  assignedStudent    User                 @relation("StudentDefenseSchedules", fields: [assignedStudentId], references: [id], onDelete: Cascade)
+
+  projectId          String
+  project            Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  // Designated Panel Members with statutory Roles (Chair, External, Supervisor)
+  panelMembers       DefensePanelMember[]
+
+  // Rubric scorecards submitted during this session
+  evaluations        Evaluation[]
+
+  status             String               @default("SCHEDULED") // SCHEDULED, COMPLETED, CANCELLED
+
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+
+  @@index([assignedStudentId])
+  @@index([type])
+  @@index([datetime])
+}
+
+// -----------------------------------------------------------------------------
+// 10. DEFENSE PANEL MEMBER MODEL (Explicit Examiner Designations & Quorum)
+// -----------------------------------------------------------------------------
+model DefensePanelMember {
+  id          String          @id @default(uuid())
+  defenseId   String
+  defense     DefenseSchedule @relation(fields: [defenseId], references: [id], onDelete: Cascade)
+
+  examinerId  String
+  examiner    User            @relation(fields: [examinerId], references: [id], onDelete: Restrict)
+
+  role        PanelRole       // PANEL_CHAIR_HOD, LEAD_SUPERVISOR, INTERNAL_EXAMINER, EXTERNAL_EXAMINER
+  hasAttended Boolean         @default(false)
+  signedAt    DateTime?
+
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  @@unique([defenseId, examinerId])
+  @@index([defenseId])
+  @@index([examinerId])
+}
+
+// -----------------------------------------------------------------------------
+// 11. EVALUATION MODEL (Viva Voce & Rubric Scoring)
+// -----------------------------------------------------------------------------
+model Evaluation {
+  id              String           @id @default(uuid())
+  defenseId       String
+  defense         DefenseSchedule  @relation(fields: [defenseId], references: [id], onDelete: Cascade)
+
+  evaluatorId     String
+  evaluator       User             @relation("EvaluatorEvaluations", fields: [evaluatorId], references: [id], onDelete: Restrict)
+
+  studentId       String
+  student         User             @relation("StudentEvaluations", fields: [studentId], references: [id], onDelete: Cascade)
+
+  // Rubric JSON:
+  // {
+  //   "originality": 24,       // max 25
+  //   "scientificRigor": 23,   // max 25 (Controls, CLSI protocols, Biosafety)
+  //   "dissertation": 24,      // max 25 (Statistical modeling, ANOVA, APA)
+  //   "vivaDefense": 25        // max 25 (Mastery during cross-examination)
+  // }
+  criteriaScores  Json
+  totalScore      Float            // Sum (0 - 100)
+  grade           String?          // e.g. "A"
+  recommendation  String?          // e.g. "First Class Honours (Distinction)"
+  comments        String?          @db.Text
+
+  status          EvaluationStatus @default(DRAFT)
+  isPublished     Boolean          @default(false) // Student ONLY sees when published
+  publishedAt     DateTime?
+
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  @@unique([defenseId, evaluatorId])
+  @@index([studentId])
+  @@index([evaluatorId])
+  @@index([isPublished])
+}
+
+// -----------------------------------------------------------------------------
+// 12. MASTER SCORE ROLLUP MODEL (Departmental Broad Sheet & Senate Gazette)
+// Aggregates all academic phases into the official statutory grade
+// -----------------------------------------------------------------------------
+model MasterScoreRollup {
+  id                   String    @id @default(uuid())
+  projectId            String    @unique
+  project              Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  proposalScore        Float     // Weight: 20%
+  benchworkScore       Float     // Weight: 20% (Certified Lab Logbooks)
+  internalDefenseScore Float     // Weight: 20%
+  externalVivaScore    Float?    // Weight: 40% (Final External Examiner Score)
+
+  finalWeightedTotal   Float?    // Total calculated composite (0 - 100%)
+  degreeClass          String?   // "First Class Honours", "Second Class Upper", etc.
+  isSenateApproved     Boolean   @default(false)
+  senateApprovedAt     DateTime?
+
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+}
+
+// -----------------------------------------------------------------------------
+// 13. CLEARANCE MODEL (Multi-Gate Stage Prerequisites)
+// -----------------------------------------------------------------------------
+model Clearance {
+  id          String          @id @default(uuid())
+  studentId   String
+  student     User            @relation("StudentClearances", fields: [studentId], references: [id], onDelete: Cascade)
+
+  stage       ClearanceStage  // BIOETHICS, BENCHWORK, TURNITIN, INTERNAL, EXTERNAL
+  status      ClearanceStatus @default(PENDING)
+  
+  clearedById String?
+  clearedBy   User?           @relation("ApproverClearances", fields: [clearedById], references: [id], onDelete: SetNull)
+
+  remarks     String?         @db.Text
+  clearedAt   DateTime?
+
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  @@unique([studentId, stage])
+  @@index([stage])
+  @@index([status])
+}

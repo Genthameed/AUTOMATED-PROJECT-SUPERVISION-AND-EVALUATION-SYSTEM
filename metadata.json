@@ -1,0 +1,6 @@
+{
+  "name": "Automated Project Supervision and Evaluation System",
+  "description": "Automated project supervision, software development & research milestones tracking, defense scheduling, and evaluation portal for the Department of Computer Science.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,76 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper function for document IDs
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128;
+    }
+
+    // Default deny catch-all for unknown paths
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // System connection test doc
+    match /test/connection {
+      allow read, write: if true;
+    }
+
+    // Departmental User Accounts (Students, Faculty, External, Admin)
+    match /users/{userId} {
+      allow get: if isValidId(userId);
+      allow list: if true;
+      allow write: if isValidId(userId);
+    }
+
+    // Undergraduate Research Project Dossiers
+    match /student_projects/{projectId} {
+      allow get: if isValidId(projectId);
+      allow list: if true;
+      allow write: if isValidId(projectId);
+    }
+
+    // Dissertation Chapter Submissions (Chapters 1 - 5)
+    match /chapter_submissions/{submissionId} {
+      allow get: if isValidId(submissionId);
+      allow list: if true;
+      allow write: if isValidId(submissionId);
+    }
+
+    // Supervisory Consultations & Lab Bench Logbook Meetings
+    match /meeting_records/{meetingId} {
+      allow get: if isValidId(meetingId);
+      allow list: if true;
+      allow write: if isValidId(meetingId);
+    }
+
+    // Defense Timetable & Oral Viva Schedules
+    match /defense_sessions/{sessionId} {
+      allow get: if isValidId(sessionId);
+      allow list: if true;
+      allow write: if isValidId(sessionId);
+    }
+
+    // External Examiner Candidate Dossiers & Evaluations
+    match /external_candidates/{candidateId} {
+      allow get: if isValidId(candidateId);
+      allow list: if true;
+      allow write: if isValidId(candidateId);
+    }
+
+    // Official Departmental Senate Broadsheet & Degree Classifications
+    match /senate_broadsheet/{entryId} {
+      allow get: if isValidId(entryId);
+      allow list: if true;
+      allow write: if isValidId(entryId);
+    }
+
+    // Statutory Defense Clearance Forms (Proposal, Internal, and External Defense)
+    match /defense_clearances/{clearanceId} {
+      allow get: if isValidId(clearanceId);
+      allow list: if true;
+      allow write: if isValidId(clearanceId);
+    }
+  }
+}
